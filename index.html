@@ -1,0 +1,69 @@
+// tracker-client.js
+// Runs in the browser — connects to the local relay server
+
+class TrackerSocket {
+  constructor(url = "ws://localhost:8080") {
+    this.url = url;
+    this.socket = null;
+    this.sendInterval = null;
+    this.connect();
+  }
+
+  connect() {
+    this.socket = new WebSocket(this.url);
+
+    this.socket.onopen = () => {
+      console.log("✅ Connected to relay server at", this.url);
+      this.startSending();
+    };
+
+    this.socket.onclose = () => {
+      console.log("❌ Disconnected. Retrying in 2s...");
+      this.stopSending();
+      setTimeout(() => this.connect(), 2000); // auto-reconnect
+    };
+
+    this.socket.onerror = (err) => {
+      console.error("WebSocket error:", err);
+    };
+
+    this.socket.onmessage = (event) => {
+      console.log("Message from server:", event.data);
+    };
+  }
+
+  startSending() {
+    // Send dummy tracker data on an interval loop
+    this.sendInterval = setInterval(() => {
+      if (this.socket.readyState !== WebSocket.OPEN) return;
+
+      const trackerData = {
+        tracker: "waist", // e.g. "waist", "left_foot", "right_foot", "chest"
+        timestamp: Date.now(),
+        position: {
+          x: Math.sin(Date.now() / 1000) * 1.0, // dummy oscillating values
+          y: 1.0 + Math.random() * 0.05,
+          z: Math.cos(Date.now() / 1000) * 1.0,
+        },
+        rotation: {
+          x: 0,
+          y: 0,
+          z: 0,
+          w: 1, // quaternion identity rotation
+        },
+      };
+
+      this.socket.send(JSON.stringify(trackerData));
+    }, 50); // 20 times per second
+  }
+
+  stopSending() {
+    if (this.sendInterval) {
+      clearInterval(this.sendInterval);
+      this.sendInterval = null;
+    }
+  }
+}
+
+// Start it up
+const trackerSocket = new TrackerSocket("ws://localhost:8080");
